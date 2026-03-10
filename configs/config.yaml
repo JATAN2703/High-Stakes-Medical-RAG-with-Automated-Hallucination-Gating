@@ -1,0 +1,89 @@
+# ============================================================
+# medical-rag/configs/config.yaml
+# Central configuration for all pipeline modules.
+# All tuneable parameters live here — never hardcode values.
+# ============================================================
+
+retriever:
+  # Embedding model (sentence-transformers)
+  embedding_model: "dmis-lab/biobert-base-cased-v1.2"
+  embedding_fallback: "all-MiniLM-L6-v2"   # used if BioBERT unavailable
+
+  # Retrieval strategy: "dense", "bm25", or "hybrid"
+  strategy: "hybrid"
+  hybrid_alpha: 0.7          # weight for dense vs BM25 (1.0 = pure dense)
+
+  # How many passages to retrieve per query
+  top_k: 5
+
+  # Max token length per chunk when splitting documents
+  chunk_size: 512
+  chunk_overlap: 64
+
+  # ChromaDB collection name
+  collection_name: "dailymed_drugs"
+
+generator:
+  # OpenRouter model string for generation
+  model: "openai/gpt-4o-mini"
+
+  # Generation parameters
+  temperature: 0.0           # deterministic for benchmarking
+  max_tokens: 512
+
+  # Number of citations the model must include per answer
+  min_citations: 1
+
+  # Prompt version to use (see configs/prompts.yaml)
+  prompt_version: "v1"
+
+evaluator:
+  # Which detection methods to run (all four by default)
+  methods:
+    - "llm_judge"
+    - "self_consistency"
+    - "faithfulness"
+    - "hhem"
+
+  llm_judge:
+    model: "anthropic/claude-3.5-sonnet"
+    temperature: 0.0
+    max_tokens: 256
+
+  self_consistency:
+    n_samples: 5             # number of generations to compare
+    temperature: 0.7         # must be > 0 for varied outputs
+    agreement_threshold: 0.6 # fraction that must agree to pass
+
+  faithfulness:
+    # Minimum fraction of claims that must be grounded in context
+    threshold: 0.75
+
+  hhem:
+    # Vectara HHEM model (runs locally via HuggingFace)
+    model_name: "vectara/hallucination_evaluation_model"
+    # Score threshold below which answer is flagged
+    threshold: 0.5
+
+experiment:
+  # Context window sizes to test (in tokens)
+  context_window_sizes: [2048, 4096, 8192]
+
+  # Fraction of documents to corrupt in adversarial condition
+  adversarial_injection_rate: 0.2
+
+  # Output directory for results
+  results_dir: "./results"
+
+  # Random seed for reproducibility
+  seed: 42
+
+data:
+  dailymed_url: "https://dailymed.nlm.nih.gov/dailymed/services/v2"
+  faers_url: "https://api.fda.gov/drug/event.json"
+
+  # Max drug labels to download for experiments
+  max_labels: 500
+
+  # Adversarial set size
+  adversarial_pairs: 75

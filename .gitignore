@@ -1,0 +1,16 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+htmlcov/
+.coverage
+data/chroma_db/
+data/dailymed/
+data/faers/
+results/
+*.egg-info/
+dist/
+build/
+.DS_Store

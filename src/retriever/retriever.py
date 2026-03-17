@@ -62,12 +62,41 @@ class Retriever:
         self.top_k = self._cfg["top_k"]
         self.alpha = self._cfg["hybrid_alpha"]
 
-        # BM25 index is built in-memory after indexing
+        # BM25 index is built in-memory — rebuild from ChromaDB if docs exist
         self._bm25: BM25Okapi | None = None
         self._indexed_docs: list[Document] = []
+        self._rebuild_bm25_from_store()
 
         logger.info(f"Retriever initialised (strategy={self.strategy}, top_k={self.top_k})")
 
+    def _rebuild_bm25_from_store(self) -> None:
+        """Rebuild BM25 index from documents already in ChromaDB."""
+        count = self.vector_store.count()
+        if count == 0:
+            return
+        try:
+            results = self.vector_store._collection.get(
+                limit=count, include=["documents", "metadatas"]
+            )
+            texts = results.get("documents", [])
+            metadatas = results.get("metadatas", [])
+            if not texts:
+                return
+            self._indexed_docs = [
+                Document(
+                    doc_id=results["ids"][i],
+                    content=texts[i],
+                    source=metadatas[i].get("source", ""),
+                    metadata=metadatas[i],
+                )
+                for i in range(len(texts))
+            ]
+            tokenised = [t.lower().split() for t in texts]
+            self._bm25 = BM25Okapi(tokenised)
+            logger.info(f"Rebuilt BM25 index from {len(texts)} stored documents.")
+        except Exception as e:
+            logger.warning(f"Could not rebuild BM25 from store: {e}")
+            
     # ── Indexing ──────────────────────────────────────────────────────────────
 
     def index(self, documents: list[Document], show_progress: bool = True) -> None:

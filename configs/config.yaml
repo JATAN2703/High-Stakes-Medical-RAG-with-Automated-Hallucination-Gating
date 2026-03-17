@@ -6,7 +6,7 @@
 
 retriever:
   # Embedding model (sentence-transformers)
-  embedding_model: "dmis-lab/biobert-base-cased-v1.2"
+  embedding_model: "sentence-transformers/all-MiniLM-L6-v2"
   embedding_fallback: "all-MiniLM-L6-v2"   # used if BioBERT unavailable
 
   # Retrieval strategy: "dense", "bm25", or "hybrid"

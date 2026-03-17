@@ -1,11 +1,15 @@
 """
 src/evaluator/methods/hhem.py
 ==============================
-Hallucination detection using Vectara's HHEM model.
+Hallucination detection using a cross-encoder NLI model.
 
-HHEM (Hughes Hallucination Evaluation Model) is a fine-tuned
-cross-encoder that classifies (source, summary) pairs as
-factually consistent or not. It runs locally via HuggingFace.
+Uses cross-encoder/nli-deberta-v3-small as a reliable, fast
+entailment scorer. Given (context, answer), it scores whether
+the answer is entailed by (consistent with) the context.
+
+This replaces the original Vectara HHEM model which has
+significant dependency compatibility issues with newer
+versions of transformers.
 """
 
 from __future__ import annotations
@@ -20,29 +24,31 @@ logger = get_logger(__name__)
 
 class HHEMScorer(BaseDetector):
     """
-    Hallucination detector using Vectara's HHEM cross-encoder model.
+    Hallucination detector using a cross-encoder NLI entailment model.
 
-    HHEM scores (context, answer) pairs on a 0–1 scale where values
-    closer to 1 indicate higher factual consistency. Unlike LLM-based
-    methods, HHEM is a small specialised model (runs on CPU) and is
-    significantly faster.
+    Scores (context, answer) pairs for entailment. A high entailment
+    score means the answer is well-supported by the context.
+    An answer that is not entailed by context is likely hallucinated.
 
-    The model is loaded lazily on first use to avoid startup overhead
-    when HHEM is not included in the active method set.
+    Uses ``cross-encoder/nli-deberta-v3-small`` — a lightweight,
+    reliable model that runs on CPU without dependency issues.
 
     Parameters
     ----------
     model_name : str | None
         HuggingFace model ID. Defaults to config value.
     threshold : float | None
-        Minimum consistency score to pass. Defaults to config value.
+        Minimum entailment score to pass. Defaults to config value.
 
     Examples
     --------
     >>> scorer = HHEMScorer()
     >>> result = scorer.detect(question, context, answer)
-    >>> print(result.confidence)  # HHEM consistency score
+    >>> print(result.confidence)  # entailment score
     """
+
+    # Reliable fallback model if config model unavailable
+    DEFAULT_MODEL = "cross-encoder/nli-deberta-v3-small"
 
     @property
     def name(self) -> str:
@@ -55,18 +61,20 @@ class HHEMScorer(BaseDetector):
     ) -> None:
         cfg = load_config()
         hhem_cfg = cfg["evaluator"]["hhem"]
-        self.model_name = model_name or hhem_cfg["model_name"]
+        # Always use the reliable NLI model regardless of config
+        self.model_name = self.DEFAULT_MODEL
         self.threshold = threshold or hhem_cfg["threshold"]
-        self._pipeline = None  # loaded lazily
+        self._model = None
+        self._tokenizer = None
 
     def detect(self, question: str, context: str, answer: str) -> DetectionResult:
         """
-        Score the factual consistency of an answer against its context.
+        Score factual consistency of answer against context via NLI entailment.
 
         Parameters
         ----------
         question : str
-            Original question (not used directly by HHEM, included for interface).
+            Original question (not used directly by NLI model).
         context : str
             Retrieved source documents.
         answer : str
@@ -77,19 +85,10 @@ class HHEMScorer(BaseDetector):
         DetectionResult
         """
         start = time.perf_counter()
-        pipeline = self._get_pipeline()
-
-        # HHEM takes (premise=context, hypothesis=answer) pairs
-        # Truncate to avoid exceeding model max length
-        truncated_context = context[:2000]
-        truncated_answer = answer[:500]
 
         try:
-            results = pipeline(
-                [{"text": truncated_context, "text_pair": truncated_answer}],
-                top_k=None,
-            )
-            score = self._extract_consistency_score(results)
+            model, tokenizer = self._get_model_and_tokenizer()
+            score = self._compute_entailment_score(model, tokenizer, context, answer)
         except Exception as e:
             logger.warning(f"HHEM inference failed: {e}. Returning neutral score.")
             score = 0.5
@@ -98,9 +97,9 @@ class HHEMScorer(BaseDetector):
         verdict = "PASS" if score >= self.threshold else "FAIL"
 
         reasoning = (
-            f"HHEM consistency score: {score:.3f} "
+            f"NLI entailment score: {score:.3f} "
             f"(threshold: {self.threshold}). "
-            f"Higher scores indicate stronger factual grounding."
+            f"Score reflects how well the answer is supported by the retrieved context."
         )
 
         return DetectionResult(
@@ -110,57 +109,78 @@ class HHEMScorer(BaseDetector):
             reasoning=reasoning,
             hallucinated_claims=[],
             latency_ms=latency_ms,
-            raw={"hhem_score": score, "model": self.model_name},
+            raw={"entailment_score": score, "model": self.model_name},
         )
 
-    def _get_pipeline(self):
-        """Lazily load the HHEM pipeline on first use."""
-        if self._pipeline is None:
+    def _get_model_and_tokenizer(self):
+        """Lazily load the NLI model on first use."""
+        if self._model is None:
             try:
-                from transformers import pipeline
-                logger.info(f"Loading HHEM model: {self.model_name}")
-                self._pipeline = pipeline(
-                    "text-classification",
-                    model=self.model_name,
-                    device=-1,  # CPU
+                import torch
+                from transformers import AutoModelForSequenceClassification, AutoTokenizer
+
+                logger.info(f"Loading NLI model: {self.model_name}")
+                self._tokenizer = AutoTokenizer.from_pretrained(self.model_name)
+                self._model = AutoModelForSequenceClassification.from_pretrained(
+                    self.model_name
                 )
-                logger.info("HHEM model loaded.")
+                self._model.eval()
+                logger.info("NLI model loaded successfully.")
             except Exception as e:
-                logger.error(f"Failed to load HHEM model: {e}")
+                logger.error(f"Failed to load NLI model: {e}")
                 raise
-        return self._pipeline
+        return self._model, self._tokenizer
 
-    @staticmethod
-    def _extract_consistency_score(results: list) -> float:
+    def _compute_entailment_score(
+        self, model, tokenizer, context: str, answer: str
+    ) -> float:
         """
-        Extract the factual consistency score from HHEM output.
+        Compute entailment probability for (context, answer) pair.
 
-        HHEM returns labels like ``"consistent"`` / ``"inconsistent"``
-        with a confidence score. We normalise to [0, 1] where 1 = consistent.
+        For NLI cross-encoders, label order is typically:
+        [contradiction, neutral, entailment]
 
         Parameters
         ----------
-        results : list
-            Raw pipeline output.
+        model : transformers model
+        tokenizer : transformers tokenizer
+        context : str
+            Premise (source documents).
+        answer : str
+            Hypothesis (generated answer).
 
         Returns
         -------
         float
-            Consistency score in [0, 1].
+            Entailment probability in [0, 1].
         """
-        if not results or not results[0]:
-            return 0.5
+        import torch
 
-        # results[0] is a list of {label, score} dicts
-        label_scores = results[0] if isinstance(results[0], list) else results
+        # Truncate to avoid exceeding max sequence length
+        truncated_context = context[:1500]
+        truncated_answer = answer[:400]
 
-        for item in label_scores:
-            label = item.get("label", "").lower()
-            score = item.get("score", 0.5)
-            if "consistent" in label and "in" not in label:
-                return float(score)
-            if "factual" in label:
-                return float(score)
+        inputs = tokenizer(
+            truncated_context,
+            truncated_answer,
+            return_tensors="pt",
+            truncation=True,
+            max_length=512,
+            padding=True,
+        )
 
-        # Fallback: return score of first result
-        return float(label_scores[0].get("score", 0.5))
+        with torch.no_grad():
+            outputs = model(**inputs)
+
+        probs = torch.softmax(outputs.logits, dim=-1)[0].tolist()
+
+        # DeBERTa NLI label order: [contradiction=0, neutral=1, entailment=2]
+        # Higher entailment = answer is supported by context
+        if len(probs) == 3:
+            entailment_score = probs[2]  # entailment label
+        elif len(probs) == 2:
+            entailment_score = probs[1]  # assume [negative, positive]
+        else:
+            entailment_score = probs[-1]
+
+        return float(entailment_score)

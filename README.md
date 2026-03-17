@@ -10,7 +10,7 @@ A production-grade RAG pipeline focused on pharmacology and drug safety, with a 
 
 > *Which hallucination detection method most reliably identifies fabricated or conflicting drug safety information in a pharmacology RAG pipeline — and under what conditions does each method fail?*
 
----
+--
 
 ## Architecture
 

@@ -59,6 +59,8 @@ class SelfConsistencyChecker(BaseDetector):
         gen_cfg = cfg["generator"]
 
         self.n_samples = n_samples or sc_cfg["n_samples"]
+        if self.n_samples < 2:
+            raise ValueError("n_samples must be at least 2 for pairwise agreement.")
         self.temperature = temperature or sc_cfg["temperature"]
         self.threshold = agreement_threshold or sc_cfg["agreement_threshold"]
         self.model = gen_cfg["model"]

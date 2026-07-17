@@ -57,7 +57,7 @@ class TestGenerator:
         with patch("src.generator.generator.call_llm") as mock_call:
             mock_call.return_value = "Warfarin interacts with aspirin [Source 1]."
             gen = Generator(model="openai/gpt-4o-mini")
-            return gen, mock_call
+            yield gen, mock_call
 
     def test_generate_returns_response_object(self, mock_generator):
         gen, _ = mock_generator

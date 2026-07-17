@@ -205,8 +205,9 @@ class Generator:
             question=question,
         )
 
+        # The caller's original answer counts as sample 0, so we generate n-1 more.
         responses = []
-        for i in range(n):
+        for i in range(n - 1):
             answer = call_llm(
                 system_prompt=system,
                 user_prompt=user,
@@ -215,6 +216,6 @@ class Generator:
                 max_tokens=256,
             )
             responses.append(answer)
-            logger.debug(f"Consistency sample {i+1}/{n} complete.")
+            logger.debug(f"Consistency sample {i+1}/{n-1} complete.")
 
         return responses

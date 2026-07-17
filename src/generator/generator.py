@@ -19,7 +19,7 @@ from src.utils import call_llm, get_logger, load_config, load_prompts
 logger = get_logger(__name__)
 
 
-# ── Response model ────────────────────────────────────────────────────────────
+# Response model
 
 @dataclass
 class GeneratorResponse:
@@ -59,7 +59,7 @@ class GeneratorResponse:
         return "conflicting information" in self.answer.lower()
 
 
-# ── Generator ─────────────────────────────────────────────────────────────────
+# Generator
 
 class Generator:
     """

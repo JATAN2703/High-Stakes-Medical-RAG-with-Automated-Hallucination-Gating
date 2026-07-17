@@ -1,11 +1,11 @@
 # ============================================================
 # configs/prompts.yaml
 # All prompts are versioned here. Never embed prompt strings
-# directly in Python code — always load from this file.
+# directly in Python code, always load from this file.
 # ============================================================
 
 v1:
-  # ── Generator prompt ──────────────────────────────────────
+  # Generator prompt
   generator_system: |
     You are a precise medical information assistant specialising in drug safety
     and pharmacology. Your answers must be grounded exclusively in the provided
@@ -27,7 +27,7 @@ v1:
 
     Answer (cite sources inline):
 
-  # ── LLM-as-Judge prompt ───────────────────────────────────
+  # LLM-as-Judge prompt
   judge_system: |
     You are a rigorous hallucination detection auditor for medical AI systems.
     You will be given a question, a set of source documents, and an AI-generated
@@ -57,7 +57,7 @@ v1:
 
     Evaluate for hallucinations:
 
-  # ── Self-consistency prompt ───────────────────────────────
+  # Self-consistency prompt
   consistency_system: |
     You are a medical information assistant. Answer questions about drug safety
     using only the provided context. Be concise and precise.

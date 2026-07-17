@@ -1,7 +1,7 @@
 # ============================================================
 # medical-rag/configs/config.yaml
 # Central configuration for all pipeline modules.
-# All tuneable parameters live here — never hardcode values.
+# All tuneable parameters live here, never hardcode values.
 # ============================================================
 
 retriever:

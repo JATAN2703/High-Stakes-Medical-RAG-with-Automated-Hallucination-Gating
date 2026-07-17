@@ -30,7 +30,7 @@ class HHEMScorer(BaseDetector):
     score means the answer is well-supported by the context.
     An answer that is not entailed by context is likely hallucinated.
 
-    Uses ``cross-encoder/nli-deberta-v3-small`` — a lightweight,
+    Uses ``cross-encoder/nli-deberta-v3-small``, a lightweight,
     reliable model that runs on CPU without dependency issues.
 
     Parameters

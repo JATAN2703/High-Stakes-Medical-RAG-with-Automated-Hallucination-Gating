@@ -36,7 +36,7 @@ from src.utils import get_logger, load_config
 logger = get_logger(__name__)
 
 
-# ── Sample medical questions for benchmarking ─────────────────────────────────
+# Sample medical questions for benchmarking
 
 BENCHMARK_QUESTIONS = [
     "What are the most common adverse reactions associated with warfarin?",

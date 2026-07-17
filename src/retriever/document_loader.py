@@ -3,7 +3,7 @@ src/retriever/document_loader.py
 =================================
 Loaders for FDA DailyMed drug labels (XML) and FAERS adverse event reports.
 
-Each loader returns a list of ``Document`` objects — a lightweight dataclass
+Each loader returns a list of ``Document`` objects, a lightweight dataclass
 holding text content and metadata. All parsing logic is isolated here so
 the rest of the pipeline is agnostic to data source format.
 """
@@ -25,7 +25,7 @@ from src.utils import get_logger
 logger = get_logger(__name__)
 
 
-# ── Data model ────────────────────────────────────────────────────────────────
+# Data model
 
 @dataclass
 class Document:
@@ -56,7 +56,7 @@ class Document:
             raise ValueError(f"Document {self.doc_id} has empty content.")
 
 
-# ── DailyMed Loader ───────────────────────────────────────────────────────────
+# DailyMed Loader
 
 class DailyMedLoader:
     """
@@ -335,21 +335,21 @@ class DailyMedLoader:
              "when initiating or stopping any concomitant drug. Significant interactions also occur with "
              "alcohol, cranberry juice, and grapefruit."),
             ("warfarin", "contraindications",
-             "Warfarin is contraindicated in: pregnancy — causes fetal hemorrhage and death; patients "
+             "Warfarin is contraindicated in: pregnancy, causes fetal hemorrhage and death; patients "
              "with hemorrhagic tendencies or blood dyscrasias; recent CNS or ophthalmic surgery; "
              "active bleeding from GI, GU, or respiratory tract; threatened abortion; bacterial "
              "endocarditis; hypersensitivity to warfarin or any component of the product."),
             ("warfarin", "warnings",
              "Bleeding risk: warfarin can cause serious and potentially fatal bleeding. Perform regular "
              "INR monitoring. Drugs, dietary changes, and patient factors all affect INR. Necrosis and "
-             "gangrene: rare but serious — often occurs 3-10 days after initiation, usually in patients "
+             "gangrene: rare but serious, often occurs 3-10 days after initiation, usually in patients "
              "with protein C or S deficiency. Systemic atheroemboli and cholesterol microemboli: purple "
              "toes syndrome may occur. Limb ischemia, infarction, and gangrene have been reported."),
             ("metformin", "adverse_reactions",
              "Most common adverse reactions (>5%): diarrhea (53.2%), nausea/vomiting (25.5%), "
              "flatulence (12.1%), asthenia (9.2%), indigestion (7.1%), abdominal discomfort (6.4%), "
              "headache (5.7%). GI symptoms most common during initiation and generally transient. "
-             "Lactic acidosis: rare (0.03 cases/1000 patient-years) but serious — fatal in ~50% of "
+             "Lactic acidosis: rare (0.03 cases/1000 patient-years) but serious, fatal in ~50% of "
              "cases. Symptoms include malaise, myalgias, respiratory distress, abdominal pain, and "
              "hypothermia. Vitamin B12 deficiency occurs in ~7% with long-term use."),
             ("metformin", "drug_interactions",
@@ -357,7 +357,7 @@ class DailyMedLoader:
              "acidosis risk. Cationic drugs (amiloride, digoxin, morphine, quinidine, ranitidine, "
              "triamterene, trimethoprim, vancomycin) compete for tubular transport systems and may "
              "increase metformin plasma levels. Iodinated contrast agents may cause acute kidney "
-             "injury — withhold metformin before and for 48 hours after contrast administration. "
+             "injury, withhold metformin before and for 48 hours after contrast administration. "
              "Alcohol potentiates metformin effect on lactate metabolism."),
             ("metformin", "contraindications",
              "Metformin is contraindicated in: eGFR below 30 mL/min/1.73m2 (increased lactic acidosis "
@@ -367,7 +367,7 @@ class DailyMedLoader:
              "procedures requiring restricted food and fluid intake."),
             ("lisinopril", "adverse_reactions",
              "Hypertension trials: hypotension (1.2%), dizziness (6.3%), headache (5.7%), diarrhea "
-             "(2.7%), fatigue (3.3%). Dry cough occurs in 2.5-35% of patients per published reports — "
+             "(2.7%), fatigue (3.3%). Dry cough occurs in 2.5-35% of patients per published reports, "
              "a class effect of ACE inhibitors. Angioedema occurs in 0.1-0.5%; Black patients have "
              "higher incidence. Hyperkalemia (serum K+ >5.7 mEq/L) in 2.2-6.0% of patients. "
              "Renal impairment, elevated creatinine (1.8-fold), and rare cases of acute renal failure "
@@ -376,14 +376,14 @@ class DailyMedLoader:
              "NSAIDs including COX-2 inhibitors may reduce antihypertensive effect and worsen renal "
              "function particularly in elderly, volume-depleted, or impaired renal function patients. "
              "Potassium-sparing diuretics (spironolactone, eplerenone, amiloride) and potassium "
-             "supplements increase hyperkalemia risk — monitor serum potassium. Lithium: increased "
+             "supplements increase hyperkalemia risk, monitor serum potassium. Lithium: increased "
              "serum lithium levels and toxicity reported. Dual RAAS blockade with ARBs or aliskiren: "
-             "increased hypotension, hyperkalemia, renal impairment — avoid combination."),
+             "increased hypotension, hyperkalemia, renal impairment, avoid combination."),
             ("lisinopril", "contraindications",
              "Contraindicated in: history of ACE inhibitor-associated angioedema; hereditary or "
              "idiopathic angioedema; concomitant use with aliskiren in patients with diabetes; "
              "concomitant use with sacubitril/valsartan within 36 hours of each other; "
-             "pregnancy — causes fetal renal dysplasia, oligohydramnios, skull hypoplasia, "
+             "pregnancy, causes fetal renal dysplasia, oligohydramnios, skull hypoplasia, "
              "pulmonary hypoplasia, limb contractures, and neonatal death. Stop immediately if "
              "pregnancy is detected."),
             ("atorvastatin", "adverse_reactions",
@@ -394,11 +394,11 @@ class DailyMedLoader:
              "Hemorrhagic stroke: increased risk in patients with recent stroke or TIA. "
              "Immune-mediated necrotizing myopathy reported rarely."),
             ("atorvastatin", "drug_interactions",
-             "Atorvastatin metabolized by CYP3A4. Strong CYP3A4 inhibitors — clarithromycin, "
+             "Atorvastatin metabolized by CYP3A4. Strong CYP3A4 inhibitors, clarithromycin, "
              "itraconazole, ketoconazole, HIV protease inhibitors (lopinavir, ritonavir), hepatitis C "
-             "protease inhibitors, nefazodone — markedly increase atorvastatin exposure and myopathy "
-             "risk. Cyclosporine increases AUC 8.7-fold — limit atorvastatin to 10mg/day. Gemfibrozil "
-             "increases myopathy risk — avoid combination. Colchicine combined with statins: myopathy "
+             "protease inhibitors, nefazodone, markedly increase atorvastatin exposure and myopathy "
+             "risk. Cyclosporine increases AUC 8.7-fold, limit atorvastatin to 10mg/day. Gemfibrozil "
+             "increases myopathy risk, avoid combination. Colchicine combined with statins: myopathy "
              "cases reported. Diltiazem and verapamil increase atorvastatin AUC ~2.5-3.4 fold."),
             ("aspirin", "adverse_reactions",
              "GI reactions: dyspepsia, nausea, vomiting, gross GI bleeding, peptic ulcers, and "
@@ -416,30 +416,30 @@ class DailyMedLoader:
              "by displacement from plasma proteins and reduced renal clearance."),
             ("amoxicillin", "adverse_reactions",
              "GI: diarrhea, gastritis, nausea, vomiting, hemorrhagic colitis, Clostridioides "
-             "difficile-associated diarrhea (CDAD — ranging from mild diarrhea to fatal colitis). "
+             "difficile-associated diarrhea (CDAD, ranging from mild diarrhea to fatal colitis). "
              "Hypersensitivity: rash, urticaria, serum sickness-like reactions, erythema multiforme, "
-             "Stevens-Johnson syndrome, anaphylaxis — serious and occasionally fatal anaphylaxis "
+             "Stevens-Johnson syndrome, anaphylaxis, serious and occasionally fatal anaphylaxis "
              "reported. Maculopapular rash occurs frequently in patients with EBV mononucleosis. "
              "CNS: agitation, anxiety, confusion, convulsions (high doses), dizziness."),
             ("amoxicillin", "drug_interactions",
-             "Probenecid: blocks renal tubular secretion of amoxicillin, increasing plasma levels — "
+             "Probenecid: blocks renal tubular secretion of amoxicillin, increasing plasma levels, "
              "do not use to extend amoxicillin half-life. Anticoagulants: abnormal prolongation of "
              "prothrombin time with amoxicillin; monitor PT/INR in patients on anticoagulants. "
              "Oral contraceptives: may reduce effectiveness due to gut flora disruption. "
-             "Allopurinol: increases incidence of rashes. Bacteriostatic antibiotics — "
-             "chloramphenicol, tetracyclines, sulfonamides — may antagonize bactericidal effect."),
+             "Allopurinol: increases incidence of rashes. Bacteriostatic antibiotics, "
+             "chloramphenicol, tetracyclines, sulfonamides, may antagonize bactericidal effect."),
             ("metoprolol", "adverse_reactions",
              "CNS: tiredness (10%), dizziness (10%), depression (5%), headache (6%). Cardiovascular: "
              "bradycardia (3-4% dose-related), heart failure worsening, hypotension. Respiratory: "
              "shortness of breath (3%), bronchospasm in susceptible patients. GI: diarrhea (5%), "
              "nausea (3.4%), dry mouth (1.4%). Abrupt withdrawal may exacerbate angina, MI, and "
-             "ventricular arrhythmia — taper over 1-2 weeks when discontinuing."),
+             "ventricular arrhythmia, taper over 1-2 weeks when discontinuing."),
             ("metoprolol", "drug_interactions",
              "Catecholamine-depleting drugs (reserpine, MAOIs): may produce excessive reduction in "
-             "sympathetic activity — monitor for hypotension and bradycardia. CYP2D6 inhibitors "
+             "sympathetic activity, monitor for hypotension and bradycardia. CYP2D6 inhibitors "
              "(fluoxetine, paroxetine, propafenone, quinidine): increase metoprolol plasma levels "
              "up to 5-fold. Clonidine: if withdrawn while on beta-blocker, rebound hypertension "
-             "may occur — taper clonidine slowly. Calcium channel blockers (verapamil, diltiazem): "
+             "may occur, taper clonidine slowly. Calcium channel blockers (verapamil, diltiazem): "
              "additive negative chronotropic and inotropic effects."),
         ]
 
@@ -472,7 +472,7 @@ class DailyMedLoader:
         return docs
 
 
-# ── FAERS Loader ───────────────────────────────────────────────────────────────
+# FAERS Loader
 
 class FAERSLoader:
     """

@@ -29,7 +29,7 @@ class Retriever:
     Hybrid retriever combining dense vector search with BM25 lexical search.
 
     Dense retrieval captures semantic meaning while BM25 excels at exact
-    drug name and terminology matching — both are critical in pharmacology.
+    drug name and terminology matching, both are critical in pharmacology.
 
     Parameters
     ----------
@@ -62,7 +62,7 @@ class Retriever:
         self.top_k = self._cfg["top_k"]
         self.alpha = self._cfg["hybrid_alpha"]
 
-        # BM25 index is built in-memory — rebuild from ChromaDB if docs exist
+        # BM25 index is built in-memory, rebuild from ChromaDB if docs exist
         self._bm25: BM25Okapi | None = None
         self._indexed_docs: list[Document] = []
         self._rebuild_bm25_from_store()
@@ -97,7 +97,7 @@ class Retriever:
         except Exception as e:
             logger.warning(f"Could not rebuild BM25 from store: {e}")
             
-    # ── Indexing ──────────────────────────────────────────────────────────────
+    # Indexing
 
     def index(self, documents: list[Document], show_progress: bool = True) -> None:
         """
@@ -158,7 +158,7 @@ class Retriever:
 
         logger.info(f"Injected {len(documents)} adversarial documents.")
 
-    # ── Retrieval ─────────────────────────────────────────────────────────────
+    # Retrieval
 
     def retrieve(
         self,
@@ -308,7 +308,7 @@ class Retriever:
             total += length
         return truncated
 
-    # ── Formatting ────────────────────────────────────────────────────────────
+    # Formatting
 
     @staticmethod
     def format_context(results: list[dict[str, Any]]) -> str:

@@ -71,7 +71,7 @@ class VectorStore:
             f"has {self._collection.count()} documents."
         )
 
-    # ── Write operations ──────────────────────────────────────────────────────
+    # Write operations
 
     def add_documents(
         self,
@@ -152,7 +152,7 @@ class VectorStore:
         )
         logger.info(f"Cleared collection '{self.collection_name}'.")
 
-    # ── Read operations ───────────────────────────────────────────────────────
+    # Read operations
 
     def query(
         self,

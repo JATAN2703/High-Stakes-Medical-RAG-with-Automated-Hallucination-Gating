@@ -27,7 +27,7 @@ from src.utils import get_logger, load_config
 logger = get_logger(__name__)
 
 
-# ── Result models ─────────────────────────────────────────────────────────────
+# Result models
 
 @dataclass
 class EvaluationResult:
@@ -43,7 +43,7 @@ class EvaluationResult:
     answer : str
         Generated answer being evaluated.
     ground_truth_label : str | None
-        ``"hallucination"`` or ``"grounded"`` — from adversarial ground truth.
+        ``"hallucination"`` or ``"grounded"``, from adversarial ground truth.
     detections : dict[str, DetectionResult]
         Method name → DetectionResult for each active method.
     context_token_count : int
@@ -126,7 +126,7 @@ class BenchmarkReport:
     def print_summary(self) -> None:
         """Print a formatted metrics table to stdout."""
         print(f"\n{'='*70}")
-        print(f"  Benchmark Report — Condition: {self.condition}")
+        print(f"  Benchmark Report (condition: {self.condition})")
         if self.context_window:
             print(f"  Context window: {self.context_window} tokens")
         print(f"  Examples: {len(self.results)}")
@@ -146,7 +146,7 @@ class BenchmarkReport:
         print(f"{'='*70}\n")
 
 
-# ── Evaluator ─────────────────────────────────────────────────────────────────
+# Evaluator
 
 class Evaluator:
     """

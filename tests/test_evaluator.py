@@ -21,7 +21,7 @@ from src.evaluator.methods.llm_judge import LLMJudge
 from src.evaluator.methods.self_consistency import SelfConsistencyChecker
 
 
-# ── DetectionResult tests ─────────────────────────────────────────────────────
+# DetectionResult tests
 
 class TestDetectionResult:
     def test_is_hallucination_true_for_fail(self):
@@ -39,7 +39,7 @@ class TestDetectionResult:
         assert r.is_hallucination is False
 
 
-# ── EvaluationResult tests ────────────────────────────────────────────────────
+# EvaluationResult tests
 
 class TestEvaluationResult:
     @pytest.fixture
@@ -94,7 +94,7 @@ class TestEvaluationResult:
         assert result.is_true_negative("method_a") is True
 
 
-# ── FaithfulnessScorer tests ──────────────────────────────────────────────────
+# FaithfulnessScorer tests
 
 class TestFaithfulnessScorer:
     @pytest.fixture
@@ -145,7 +145,7 @@ class TestFaithfulnessScorer:
         assert isinstance(result.hallucinated_claims, list)
 
 
-# ── LLMJudge tests ─────────────────────────────────────────────────────────────
+# LLMJudge tests
 
 class TestLLMJudge:
     @pytest.fixture
@@ -191,7 +191,7 @@ class TestLLMJudge:
             assert isinstance(result.hallucinated_claims, list)
 
 
-# ── SelfConsistencyChecker tests ──────────────────────────────────────────────
+# SelfConsistencyChecker tests
 
 class TestSelfConsistencyChecker:
     @pytest.fixture
@@ -234,7 +234,7 @@ class TestSelfConsistencyChecker:
             checker = SelfConsistencyChecker(n_samples=1)
 
 
-# ── Evaluator orchestration tests ─────────────────────────────────────────────
+# Evaluator orchestration tests
 
 class TestEvaluator:
     @pytest.fixture

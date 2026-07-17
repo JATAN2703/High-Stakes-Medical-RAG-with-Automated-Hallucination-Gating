@@ -18,7 +18,7 @@ from openai import OpenAI
 
 load_dotenv()
 
-# ── Logging ──────────────────────────────────────────────────────────────────
+# Logging
 
 def get_logger(name: str) -> logging.Logger:
     """
@@ -47,7 +47,7 @@ def get_logger(name: str) -> logging.Logger:
     return logger
 
 
-# ── Config ───────────────────────────────────────────────────────────────────
+# Config
 
 @lru_cache(maxsize=1)
 def load_config(path: str = "configs/config.yaml") -> dict[str, Any]:
@@ -98,7 +98,7 @@ def load_prompts(path: str = "configs/prompts.yaml") -> dict[str, Any]:
         return yaml.safe_load(f)
 
 
-# ── OpenRouter Client ─────────────────────────────────────────────────────────
+# OpenRouter Client
 
 @lru_cache(maxsize=1)
 def get_openrouter_client() -> OpenAI:

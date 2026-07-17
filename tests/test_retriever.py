@@ -16,7 +16,7 @@ from src.retriever.retriever import Retriever
 from src.retriever.vector_store import VectorStore
 
 
-# ── Document tests ────────────────────────────────────────────────────────────
+# Document tests
 
 class TestDocument:
     def test_valid_document_creation(self):
@@ -37,7 +37,7 @@ class TestDocument:
         assert doc.metadata == {}
 
 
-# ── Embedder tests ────────────────────────────────────────────────────────────
+# Embedder tests
 
 class TestEmbedder:
     @pytest.fixture
@@ -73,7 +73,7 @@ class TestEmbedder:
         assert vectors.dtype == np.float32
 
 
-# ── VectorStore tests ─────────────────────────────────────────────────────────
+# VectorStore tests
 
 class TestVectorStore:
     @pytest.fixture
@@ -132,7 +132,7 @@ class TestVectorStore:
         assert store.count() == 5  # not 10
 
 
-# ── Retriever tests ───────────────────────────────────────────────────────────
+# Retriever tests
 
 class TestRetriever:
     @pytest.fixture

@@ -1,14 +1,14 @@
 # High-Stakes Medical RAG with Hallucination Detection Benchmarking
 
-**Foundations of Generative AI — Final Project**
+Final project for the Foundations of Generative AI course.
 
-A production-grade RAG pipeline focused on pharmacology and drug safety, with a rigorous benchmarking suite comparing four hallucination detection methods. Rather than building a generic chatbot, this system tackles the real industry bottleneck: *trusting the output*.
+A RAG pipeline focused on pharmacology and drug safety, with a benchmarking suite that compares four hallucination detection methods. I wanted to avoid building yet another generic chatbot and instead dig into the part that actually blocks these systems from being used in medicine: knowing when to trust the output.
 
 ---
 
 ## Research Question
 
-> *Which hallucination detection method most reliably identifies fabricated or conflicting drug safety information in a pharmacology RAG pipeline — and under what conditions does each method fail?*
+> Which hallucination detection method most reliably identifies fabricated or conflicting drug safety information in a pharmacology RAG pipeline, and under what conditions does each method fail?
 
 ---
 
@@ -49,7 +49,7 @@ Three fully decoupled modules with clean interfaces:
 | Faithfulness Score | 20% | 22ms |
 | Self-Consistency | 60% | 10,408ms |
 
-### Long-Context Condition — FPR across context window sizes
+### Long-Context Condition (FPR across context window sizes)
 
 | Method | 2048 tokens | 4096 tokens | 8192 tokens |
 |---|---|---|---|
@@ -60,13 +60,13 @@ Three fully decoupled modules with clean interfaces:
 
 ### Key Findings
 
-1. **NLI-based detection is the best overall method.** Highest F1 (0.500), lowest FPR on adversarial (10.5%), consistent behaviour across all context window sizes, and 30× faster than LLM-as-Judge.
+1. **NLI-based detection came out best overall.** Highest F1 (0.500), lowest FPR on the adversarial set (10.5%), stable behaviour across every context window size I tested, and roughly 30x faster than LLM-as-Judge.
 
-2. **LLM-as-Judge failed completely on adversarial detection.** 0% recall across 20 adversarial samples despite being the slowest and most expensive method (~5s/sample). GPT-4o-mini is unable to self-evaluate grounded-sounding hallucinations.
+2. **LLM-as-Judge failed completely on adversarial detection.** 0% recall across 20 adversarial samples, despite being the slowest and most expensive method (~5s/sample). GPT-4o-mini simply could not self-evaluate hallucinations that were phrased to sound grounded.
 
-3. **Self-consistency is a false alarm generator.** 100% recall but only 7.1% precision and 60–80% FPR across all conditions — unusable in any production system.
+3. **Self-consistency is essentially a false-alarm generator.** 100% recall, but only 7.1% precision and 60 to 80% FPR across all conditions. Not usable in a production setting.
 
-4. **Faithfulness scoring offers the best speed–accuracy tradeoff.** 31ms per sample with F1=0.222 on adversarial and lower FPR than self-consistency. Ideal for high-throughput pipelines where latency matters.
+4. **Faithfulness scoring gave the best speed-to-accuracy tradeoff.** 31ms per sample with F1=0.222 on adversarial and a lower FPR than self-consistency, which makes it a reasonable choice for high-throughput pipelines where latency matters.
 
 ---
 
@@ -95,10 +95,10 @@ cp .env.example .env
 
 ```bash
 # Downloads 25 specific drugs by name (warfarin, metformin, SSRIs, fluoroquinolones, etc.)
-# All XMLs are cached locally — subsequent runs are instant
+# All XMLs are cached locally, so subsequent runs are instant
 python scripts/ingest_targeted.py
 
-# Optional: ingest by random DailyMed listing (less reliable — returns mixed content)
+# Optional: ingest by random DailyMed listing (less reliable, returns mixed content)
 python scripts/ingest_data.py --source dailymed --max-labels 200
 ```
 
@@ -137,7 +137,7 @@ python experiments/run_benchmark.py --condition long_context --n-samples 10
 
 | Method | Type | Speed | Notes |
 |---|---|---|---|
-| `llm_judge` | LLM-based (GPT-4o-mini via OpenRouter) | ~5s | Fails on adversarial — 0% recall |
+| `llm_judge` | LLM-based (GPT-4o-mini via OpenRouter) | ~5s | Fails on adversarial, 0% recall |
 | `self_consistency` | N=5 sampling + ROUGE-L agreement | ~10s | High recall, unusable FPR |
 | `faithfulness` | Claim-level ROUGE-L grounding score | ~30ms | Fast, interpretable, competitive |
 | `hhem` | NLI cross-encoder (DeBERTa-v3-small) | ~165ms | Best F1 and most stable across conditions |
@@ -278,3 +278,16 @@ pytest tests/ --cov=src --cov-report=term-missing
 - **Reproducible**: All experiments seeded (seed=42), prompts versioned in `configs/prompts.yaml`, all results logged to timestamped JSON
 - **Testable**: Full pytest suite, no methods over 20 lines, full docstrings on every public method
 - **Production-grade**: No primitive obsession, dependency injection throughout, BaseDetector ABC enforces consistent interface across all four detection methods
+
+---
+
+## Limitations and What I'd Do Differently
+
+A few things I'd flag honestly about the current results:
+
+- **Small sample sizes.** The headline numbers come from 20 adversarial and 5 clean samples. That's enough to see clear directional differences (NLI vs LLM-judge is not subtle), but the precision/FPR figures should be read as indicative, not final. A proper evaluation would run a few hundred samples per condition.
+- **Single generator model.** Everything runs on GPT-4o-mini. The LLM-as-Judge failure in particular might look different with a stronger judge model, and I didn't get to test that.
+- **ROUGE-L as a grounding proxy.** Both faithfulness and self-consistency lean on ROUGE-L, which rewards lexical overlap. A paraphrased-but-correct answer can be penalised, which likely inflates their false-positive rates.
+- **HHEM substitution.** I used `cross-encoder/nli-deberta-v3-small` in place of Vectara's HHEM (see the note above). It works well, but it isn't the exact model the original design called for.
+
+If I extended this, the first steps would be scaling the sample counts, adding a second (stronger) judge model, and swapping ROUGE-L for an embedding-based grounding score.

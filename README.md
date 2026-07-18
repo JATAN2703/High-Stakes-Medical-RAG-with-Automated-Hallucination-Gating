@@ -33,6 +33,16 @@ Three fully decoupled modules with clean interfaces:
 
 ### Adversarial Condition (20 samples, 20% contradiction injection rate)
 
+Generator and judge: GPT-4o-mini via OpenRouter.
+
+> **Important caveat (found during a later audit):** in this run the adversarial
+> documents were only injected into the corpus and had to be *retrieved* to affect
+> a sample. They were built from unrelated OTC products, so they were almost never
+> retrieved for these pharmacology questions. As a result only **1 of the 20
+> samples** actually ended up labelled "hallucination". The recall/precision figures
+> below are therefore computed over a positive class of ~1 and should be read as
+> anecdotal, not robust. See [Follow-up analysis](#follow-up-analysis-balanced-injection--stronger-model) for a rebuilt, balanced experiment.
+
 | Method | Recall | Precision | F1 | FPR | Latency |
 |---|---|---|---|---|---|
 | **NLI Detection** | **100%** | **33.3%** | **0.500** | **10.5%** | 165ms |
@@ -67,6 +77,84 @@ Three fully decoupled modules with clean interfaces:
 3. **Self-consistency is essentially a false-alarm generator.** 100% recall, but only 7.1% precision and 60 to 80% FPR across all conditions. Not usable in a production setting.
 
 4. **Faithfulness scoring gave the best speed-to-accuracy tradeoff.** 31ms per sample with F1=0.222 on adversarial and a lower FPR than self-consistency, which makes it a reasonable choice for high-throughput pipelines where latency matters.
+
+> These findings hold for the original GPT-4o-mini setup, but note the adversarial
+> caveat above. The follow-up analysis below re-ran the experiment with a fixed,
+> balanced injection and a stronger model, and the picture changes in instructive ways.
+
+---
+
+## Follow-up analysis: balanced injection + stronger model
+
+After the first pass I audited the adversarial setup and found two problems: the
+positive class had collapsed to ~1 sample (see the caveat above), and I wanted to
+know how much of the LLM-as-Judge failure was model capability versus method. So I
+made two changes and re-ran:
+
+1. **Rebuilt the adversarial injection.** Instead of hoping an unrelated adversarial
+   document gets retrieved, a contradiction about the *question's own drug* is now
+   synthesised from a template and injected directly into the generator's context on
+   a fixed 50% of samples. This gives a balanced, meaningful positive class (10
+   injected / 10 clean).
+2. **Swapped the generator and judge to Claude Sonnet** (via the Anthropic API) to
+   test whether a frontier model changes the result.
+
+### Results (Claude Sonnet, balanced injection)
+
+Adversarial, n=20 (10 contradiction-injected, 10 clean):
+
+| Method | Recall | Precision | F1 | FPR |
+|---|---|---|---|---|
+| LLM-as-Judge | 20% | **66.7%** | **0.308** | 10% |
+| Faithfulness Score | 100% | 50% | 0.667* | 100% |
+| NLI Detection | 0% | 0% | 0.000 | 10% |
+
+Clean, n=10 (FPR): LLM-as-Judge 20%, Faithfulness 80%, NLI 10%.
+
+\* Faithfulness's F1 looks high only because it flags *everything* (100% recall at
+100% FPR) - it is not discriminating between grounded and hallucinated answers here.
+
+### What changed, and why it matters
+
+1. **A strong generator neutralises most injected contradictions.** Of the 10
+   samples where a contradiction was injected into the context, Sonnet hedged on 1,
+   answered from the real label on most, and in several cases *explicitly flagged the
+   conflict* ("Sources present conflicting information"). The confident propagation
+   of contradictions that the original study measured looks largely like a
+   weak-model behaviour. This is the most interesting finding: with a strong model
+   and a strict grounding prompt, there were few genuine hallucinations to detect.
+
+2. **LLM-as-Judge was the only discriminating detector this time.** 66.7% precision
+   and 10% FPR - when the Sonnet judge flagged an answer it was usually right. Its
+   low recall mostly reflects that there was little to catch, not that it failed. This
+   is the opposite of the GPT-4o-mini result (0% recall) and supports the idea that
+   LLM-as-Judge is heavily model-bound.
+
+3. **ROUGE-based faithfulness breaks down with a verbose, multi-source generator.**
+   It flagged 100% of adversarial and 80% of clean answers - lexical overlap
+   collapses when answers are well-written and cite several sources. It is not
+   usable as a detector in this regime.
+
+4. **NLI checks the wrong thing when the contradiction is in the context.** The
+   injected contradiction lives in the retrieved context, and the answer is largely
+   entailed *by that context*, so answer-vs-context entailment does not flag it (0%
+   recall). NLI catches fabrications the model invents, not contradictions it faithfully
+   repeats from a poisoned source.
+
+### Honest limitations of this follow-up
+
+- **Not a controlled head-to-head.** I could not re-run the GPT-4o-mini arm under the
+  new injection scheme (its API key was no longer valid), so the GPT-4o-mini and
+  Sonnet numbers use different adversarial setups and are not directly comparable.
+- **Still small (n=20 / n=10)** and single-seed. Directional, not conclusive.
+- **The label is a proxy.** "Hallucination" marks that the generator was *shown* a
+  contradiction, which is an upper bound - a strong generator often refuses to repeat
+  it, which depresses measured recall. Truly isolating detector quality would mean
+  constructing hallucinated *answers* directly rather than relying on the generator.
+- **Single generator and judge model** (Sonnet) in this arm.
+
+The runner supports this out of the box: `--model claude-sonnet-5` swaps the generator
+and judge, and `--injection-rate 0.5` sets the balanced positive class.
 
 ---
 

@@ -177,7 +177,11 @@ class Evaluator:
         "hhem": HHEMScorer,
     }
 
-    def __init__(self, methods: list[str] | None = None) -> None:
+    def __init__(
+        self,
+        methods: list[str] | None = None,
+        judge_model: str | None = None,
+    ) -> None:
         cfg = load_config()
         active_methods = methods or cfg["evaluator"]["methods"]
 
@@ -188,7 +192,11 @@ class Evaluator:
                     f"Unknown method '{method_name}'. "
                     f"Valid options: {list(self.METHOD_REGISTRY.keys())}"
                 )
-            self._detectors[method_name] = self.METHOD_REGISTRY[method_name]()
+            # Let the caller swap the judge model (e.g. for a model-tier comparison).
+            if method_name == "llm_judge" and judge_model:
+                self._detectors[method_name] = LLMJudge(model=judge_model)
+            else:
+                self._detectors[method_name] = self.METHOD_REGISTRY[method_name]()
             logger.info(f"Registered detector: {method_name}")
 
         logger.info(f"Evaluator ready with {len(self._detectors)} methods.")

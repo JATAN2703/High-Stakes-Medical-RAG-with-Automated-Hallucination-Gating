@@ -345,6 +345,23 @@ class Evaluator:
             ]
             mean_latency = sum(latencies) / len(latencies) if latencies else 0.0
 
+            # Surface detector failures: a detector that raised on every sample
+            # produces all-zero metrics that otherwise look like a real (poor)
+            # result. Report how many samples actually produced a detection.
+            n_evaluated = len(latencies)
+            if n_evaluated < len(results):
+                logger.warning(
+                    f"Detector '{method_name}' produced a result for only "
+                    f"{n_evaluated}/{len(results)} samples; the rest failed "
+                    f"(see earlier errors). Its metrics are computed over the "
+                    f"successful samples only."
+                )
+            if n_evaluated == 0:
+                logger.error(
+                    f"Detector '{method_name}' failed on ALL samples. Its metrics "
+                    f"are 0 by default, not a real result. Check the model/config."
+                )
+
             metrics[method_name] = {
                 "true_positives": tp,
                 "false_positives": fp,
@@ -355,6 +372,8 @@ class Evaluator:
                 "f1": f1,
                 "false_positive_rate": fpr,
                 "mean_latency_ms": mean_latency,
+                "n_evaluated": n_evaluated,
+                "n_total": len(results),
             }
 
         return metrics

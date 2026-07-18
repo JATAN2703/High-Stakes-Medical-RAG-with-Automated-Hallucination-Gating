@@ -29,7 +29,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.evaluator.evaluator import Evaluator
 from src.generator.generator import Generator
-from src.retriever.document_loader import Document, DailyMedLoader
 from src.retriever.retriever import Retriever
 from src.utils import get_logger, load_config
 
@@ -57,13 +56,38 @@ BENCHMARK_QUESTIONS = [
 ]
 
 
-def load_adversarial_pairs(path: str = "data/adversarial/adversarial_pairs.json") -> list[dict]:
-    """Load pre-built adversarial document pairs."""
-    p = Path(path)
-    if not p.exists():
-        logger.error(f"Adversarial pairs not found at {p}. Run scripts/build_adversarial_set.py first.")
-        return []
-    return json.loads(p.read_text())
+# Contradiction templates, keyed by type. Each is injected into the generator's
+# context for a "hallucination" sample so the generator is shown a statement that
+# conflicts with the authoritative drug label.
+CONTRADICTION_TEMPLATES = [
+    ("severity", "{drug} is generally well-tolerated with minimal adverse effects; "
+                 "serious adverse reactions are extremely rare, occurring in fewer than 0.01% of patients."),
+    ("frequency", "Post-marketing surveillance shows adverse reactions to {drug} occur in the majority "
+                  "of patients (>50%), with most experiencing at least moderate side effects."),
+    ("interaction", "No clinically significant drug interactions have been identified for {drug}; "
+                    "it may be safely co-administered with all medication classes without monitoring."),
+    ("contraindication", "{drug} is safe in hepatic impairment, renal failure, and pregnancy. "
+                         "No contraindications have been established in any special population."),
+    ("temporal", "Adverse effects of {drug} resolve within 24 hours of discontinuation; "
+                 "long-term or permanent effects have not been reported."),
+]
+
+# Drug/class hints used to make each injected contradiction relevant to the question.
+DRUG_HINTS = [
+    "warfarin", "metformin", "lisinopril", "atorvastatin", "sumatriptan",
+    "ciprofloxacin", "levofloxacin", "sertraline", "fluoxetine", "acetaminophen",
+    "ibuprofen", "aspirin", "prednisone", "fluoroquinolone", "anticoagulant",
+    "nsaid", "ssri",
+]
+
+
+def _drug_from_question(question: str) -> str:
+    """Best-effort extraction of the drug/class a question is about."""
+    ql = question.lower()
+    for hint in DRUG_HINTS:
+        if hint in ql:
+            return hint
+    return "this medication"
 
 
 def prepare_clean_samples(
@@ -123,27 +147,38 @@ def prepare_clean_samples(
 def prepare_adversarial_samples(
     retriever: Retriever,
     generator: Generator,
-    adversarial_pairs: list[dict],
     n: int,
-    injection_rate: float = 0.2,
+    injection_rate: float = 0.5,
     seed: int = 42,
 ) -> list[dict]:
     """
-    Prepare samples with adversarial documents injected into retrieval results.
+    Prepare a balanced adversarial sample set.
 
-    For each question, retrieves normal context then injects adversarial
-    documents at the given rate. The generator sees the corrupted context.
+    For a deterministic ``injection_rate`` fraction of samples, a contradiction
+    about the question's own drug is synthesised and injected at the top of the
+    context, so the generator is shown a statement that conflicts with the
+    authoritative label. Those samples are labelled ``"hallucination"``; the
+    rest use clean retrieved context and are labelled ``"grounded"``.
+
+    This replaces the earlier design, which relied on adversarial documents
+    happening to be retrieved. Those documents were about unrelated products,
+    so they were almost never retrieved and the positive class collapsed to
+    ~1 sample. Injecting a relevant contradiction directly guarantees a
+    balanced, meaningful positive class.
+
+    Note: the label marks that the generator was *shown* a contradiction, which
+    is a proxy for hallucination risk. A strong generator may still refuse or
+    flag the contradiction rather than repeat it, so the label is an upper
+    bound on true hallucinations, not a guarantee.
 
     Parameters
     ----------
     retriever : Retriever
     generator : Generator
-    adversarial_pairs : list[dict]
-        Adversarial document pairs from build_adversarial_set.py
     n : int
         Number of samples.
     injection_rate : float
-        Fraction of retrieved docs to replace with adversarial ones.
+        Fraction of samples that receive an injected contradiction.
     seed : int
 
     Returns
@@ -151,47 +186,44 @@ def prepare_adversarial_samples(
     list[dict]
     """
     random.seed(seed)
-    questions = random.sample(BENCHMARK_QUESTIONS, min(n, len(BENCHMARK_QUESTIONS)))
-    if n > len(BENCHMARK_QUESTIONS):
-        questions = questions * (n // len(BENCHMARK_QUESTIONS) + 1)
+    questions = list(BENCHMARK_QUESTIONS)
+    random.shuffle(questions)
+    if n > len(questions):
+        questions = questions * (n // len(questions) + 1)
     questions = questions[:n]
 
-    # Inject adversarial docs into the retriever's index
-    adversarial_docs = []
-    for pair in adversarial_pairs[:int(len(adversarial_pairs) * injection_rate * 5)]:
-        adv = pair["adversarial"]
-        adversarial_docs.append(Document(
-            doc_id=adv["doc_id"],
-            content=adv["content"],
-            source=f"[ADVERSARIAL] {pair['drug_name']}",
-            metadata={"contradiction_type": adv["contradiction_type"]},
-            is_adversarial=True,
-        ))
-    retriever.inject_adversarial(adversarial_docs)
+    n_positive = round(injection_rate * n)
+    # Evenly interleave positives so the two classes aren't blocked together.
+    positive_idx = set(range(n)[::max(1, n // n_positive)][:n_positive]) if n_positive else set()
 
     samples = []
     for i, question in enumerate(questions):
-        logger.info(f"Preparing adversarial sample {i+1}/{len(questions)}: {question[:60]}...")
+        is_positive = i in positive_idx
+        tag = "adversarial" if is_positive else "clean-context"
+        logger.info(f"Preparing adversarial sample {i+1}/{len(questions)} [{tag}]: {question[:55]}...")
+
         results = retriever.retrieve(question)
         if not results:
             continue
-
         context = retriever.format_context(results)
-        response = generator.generate(question=question, context=context)
 
-        # Determine ground truth: if any adversarial doc was retrieved, label as hallucination
-        retrieved_ids = {r.get("doc_id", "") for r in results}
-        adv_ids = {doc.doc_id for doc in adversarial_docs}
-        has_adversarial = bool(retrieved_ids & adv_ids)
+        if is_positive:
+            drug = _drug_from_question(question)
+            ctype, template = CONTRADICTION_TEMPLATES[i % len(CONTRADICTION_TEMPLATES)]
+            adv_block = f"[Source 1] [ADVERSARIAL] {drug} label\n{template.format(drug=drug)}"
+            context = f"{adv_block}\n\n{context}"
+
+        response = generator.generate(question=question, context=context)
 
         samples.append({
             "question": question,
             "context": context,
             "answer": response.answer,
-            "ground_truth_label": "hallucination" if has_adversarial else "grounded",
+            "ground_truth_label": "hallucination" if is_positive else "grounded",
             "metadata": {
                 "condition": "adversarial",
-                "has_adversarial_doc": has_adversarial,
+                "contradiction_injected": is_positive,
+                "contradiction_type": ctype if is_positive else None,
                 "n_docs_retrieved": len(results),
             },
         })
@@ -254,7 +286,21 @@ def main() -> None:
         help="Methods to evaluate. Defaults to all four.",
     )
     parser.add_argument("--n-samples", type=int, default=20)
+    parser.add_argument(
+        "--injection-rate",
+        type=float,
+        default=None,
+        help="Fraction of adversarial samples that receive an injected "
+        "contradiction. Defaults to config value; use ~0.5 for a balanced set.",
+    )
     parser.add_argument("--results-dir", type=str, default="results/")
+    parser.add_argument(
+        "--model",
+        type=str,
+        default=None,
+        help="Override the generator and LLM-judge model for a model-tier "
+        "comparison (e.g. 'claude-sonnet-5'). Defaults to config values.",
+    )
     args = parser.parse_args()
 
     cfg = load_config()
@@ -264,9 +310,11 @@ def main() -> None:
     results_dir.mkdir(parents=True, exist_ok=True)
 
     logger.info("Initialising pipeline components...")
+    if args.model:
+        logger.info(f"Model override: generator + LLM-judge = {args.model}")
     retriever = Retriever()
-    generator = Generator()
-    evaluator = Evaluator(methods=args.methods)
+    generator = Generator(model=args.model) if args.model else Generator()
+    evaluator = Evaluator(methods=args.methods, judge_model=args.model)
 
     conditions_to_run = (
         ["clean", "adversarial", "long_context"]
@@ -292,13 +340,14 @@ def main() -> None:
             evaluator.save_results(report, results_dir / "clean_results.json")
 
         elif condition == "adversarial":
-            adversarial_pairs = load_adversarial_pairs()
-            if not adversarial_pairs:
-                logger.warning("Skipping adversarial condition (no pairs found).")
-                continue
+            injection_rate = (
+                args.injection_rate
+                if args.injection_rate is not None
+                else cfg["experiment"]["adversarial_injection_rate"]
+            )
             samples = prepare_adversarial_samples(
-                retriever, generator, adversarial_pairs, args.n_samples,
-                injection_rate=cfg["experiment"]["adversarial_injection_rate"],
+                retriever, generator, args.n_samples,
+                injection_rate=injection_rate,
                 seed=seed,
             )
             if not samples:
@@ -335,6 +384,7 @@ def main() -> None:
         "timestamp": timestamp,
         "conditions": conditions_to_run,
         "methods": args.methods or cfg["evaluator"]["methods"],
+        "model_override": args.model,
         "n_samples_per_condition": args.n_samples,
         "reports": [r.to_dict() for r in all_reports],
     }

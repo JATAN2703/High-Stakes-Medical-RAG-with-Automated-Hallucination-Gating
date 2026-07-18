@@ -161,7 +161,7 @@ claude-sonnet-5` (or `--model openai/gpt-4o-mini`) swaps both generator and judg
 ### 1. Clone and set up environment
 
 ```bash
-git clone <your-repo>
+git clone https://github.com/JATAN2703/High-Stakes-Medical-RAG-with-Automated-Hallucination-Gating.git
 cd medical-rag
 python -m venv .venv
 source .venv/bin/activate        # Windows: .venv\Scripts\activate
